@@ -53,7 +53,7 @@ impl Contract {
         self.candidates.to_vec()
     }
 
-    pub fn vote(&mut self, candidate: String) {
+    pub fn vote(&mut self, candidate: String) -> u32 {
         let mut c: Candidate;
         match self.candidates.get(&candidate) {
             None => {
@@ -78,11 +78,13 @@ impl Contract {
         }
 
         let vote_id = [c.id.to_string(), voter_id.to_string()].join("_");
-        assert!(!self.votes.contains(&vote_id), "you already vote");
+        // assert!(!self.votes.contains(&vote_id), "you already vote");
 
         c.votes += 1;
         self.candidates.insert(&candidate, &c);
         self.votes.insert(&vote_id);
+
+        c.votes
     }
 }
 
@@ -184,5 +186,20 @@ mod tests {
         assert_eq!(2, s.len());
         assert_eq!(1, (s[0].1).votes);
         assert_eq!(1, (s[1].1).votes);
+    }
+
+    #[test]
+    fn test_different_can_vote() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.build());
+
+        let mut contract = Contract::default();
+        contract.add_candidate("abc".to_string());
+        contract.vote("abc".to_string());
+
+        context.predecessor_account_id("alice.testnet".to_string().try_into().unwrap());
+        contract.vote("abc".to_string());
+
+        // let c = contract.get_candidates();
     }
 }
