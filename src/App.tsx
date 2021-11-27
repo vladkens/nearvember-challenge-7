@@ -33,8 +33,8 @@ const api = {
   async add_candidate(candidate: string) {
     // @ts-expect-error
     return window.contract.add_candidate({ candidate }).then(
-      (d: undefined) => d,
-      (d: string) => d
+      (d: undefined) => true,
+      (d: string) => false
     )
   },
 }
