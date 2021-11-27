@@ -1,5 +1,13 @@
+import { BanIcon } from '@heroicons/react/solid'
 import clsx from 'clsx'
 import { Suspense, useEffect, useState } from 'react'
+import {
+  AlertComponentPropsWithStyle,
+  positions,
+  Provider as AlertProvider,
+  transitions,
+  useAlert,
+} from 'react-alert'
 import NearLogo from './assets/logo-white.svg'
 import { login, logout } from './near-utils'
 
@@ -14,11 +22,11 @@ const api = {
     return candidates
   },
 
-  async vote(candidate: string) {
+  async vote(candidate: string): Promise<boolean> {
     // @ts-expect-error
     return window.contract.vote({ candidate }).then(
-      (d: undefined) => d,
-      (d: string) => d
+      (d: undefined) => true,
+      (d: string) => false
     )
   },
 
@@ -69,8 +77,11 @@ const AddCandidate: React.FC<AddCandidateProps> = ({ onClick }) => {
   const [value, setValue] = useState('')
 
   const click = async () => {
+    const name = value.trim()
+    if (name.length === 0) return
+
     setLoading(true)
-    await onClick(value)
+    await onClick(name)
     setValue('')
     setLoading(false)
   }
@@ -122,6 +133,7 @@ const LoadingButton: React.FC<LoadingButtonProps> = ({ children, onClick }) => {
 
 const Main: React.FC = () => {
   const [candidates, setCandidates] = useState<Candidates>({})
+  const alert = useAlert()
 
   useEffect(() => {
     api.get_candidates().then(setCandidates)
@@ -129,14 +141,24 @@ const Main: React.FC = () => {
 
   const vote = async (candidate: string) => {
     const res = await api.vote(candidate)
-    console.log(res)
-    api.get_candidates().then(setCandidates)
+    if (!res) {
+      alert.show(`You already voted for ${candidate}!`)
+      return
+    }
+
+    const upd = await api.get_candidates()
+    setCandidates(upd)
   }
 
   const addCandidate = async (candidate: string) => {
     const res = await api.add_candidate(candidate)
-    console.log(res)
-    api.get_candidates().then(setCandidates)
+    if (!res) {
+      alert.show(`Candidate "${candidate}" already in elections list!`)
+      return
+    }
+
+    const upd = await api.get_candidates()
+    setCandidates(upd)
   }
 
   const candidatesList = Object.entries(candidates)
@@ -200,11 +222,32 @@ const Main: React.FC = () => {
   )
 }
 
-const App: React.FC = () => {
+const Alert: React.FC<AlertComponentPropsWithStyle> = ({
+  style,
+  message,
+  close,
+}) => {
   return (
-    <Suspense fallback="Loading...">
-      {!window.walletConnection.isSignedIn() ? <Login /> : <Main />}
-    </Suspense>
+    <div className="alert alert-error justify-start" style={style}>
+      <BanIcon className="w-6 mr-2" />
+      <label>{message}</label>
+    </div>
+  )
+}
+
+const App: React.FC = () => {
+  const options = {
+    position: positions.BOTTOM_RIGHT,
+    timeout: 4000,
+    transition: transitions.SCALE,
+  }
+
+  return (
+    <AlertProvider template={Alert} {...options}>
+      <Suspense fallback="Loading...">
+        {!window.walletConnection.isSignedIn() ? <Login /> : <Main />}
+      </Suspense>
+    </AlertProvider>
   )
 }
 

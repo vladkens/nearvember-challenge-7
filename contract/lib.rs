@@ -78,7 +78,7 @@ impl Contract {
         }
 
         let vote_id = [c.id.to_string(), voter_id.to_string()].join("_");
-        // assert!(!self.votes.contains(&vote_id), "you already vote");
+        assert!(!self.votes.contains(&vote_id), "you already vote");
 
         c.votes += 1;
         self.candidates.insert(&candidate, &c);
