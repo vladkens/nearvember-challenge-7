@@ -8,6 +8,7 @@ import {
   transitions,
   useAlert,
 } from 'react-alert'
+import Confetti from 'react-dom-confetti'
 import FlipMove from 'react-flip-move'
 import NearLogo from './assets/logo-white.svg'
 import { login, logout } from './near-utils'
@@ -35,11 +36,11 @@ const api = {
     return candidates
   },
 
-  async vote(candidate: string): Promise<boolean> {
+  async vote(candidate: string): Promise<null | number> {
     // @ts-expect-error
     return window.contract.vote({ candidate }).then(
-      (d: undefined) => true,
-      (d: string) => false
+      (d: number) => d,
+      (d: string) => null
     )
   },
 
@@ -104,7 +105,7 @@ const AddCandidate: React.FC<AddCandidateProps> = ({ onClick }) => {
       <div className="relative">
         <input
           type="text"
-          placeholder="Add Candidate"
+          placeholder="Name"
           className="w-full pr-16 input input-primary input-bordered"
           onChange={(e) => setValue(e.target.value)}
           value={value}
@@ -123,15 +124,33 @@ const AddCandidate: React.FC<AddCandidateProps> = ({ onClick }) => {
   )
 }
 
-type LoadingButtonProps = { onClick: () => void }
+type VoteButtonProps = { onClick: () => void }
 
-const LoadingButton: React.FC<LoadingButtonProps> = ({ children, onClick }) => {
+const VoteButton: React.FC<VoteButtonProps> = ({ children, onClick }) => {
   const [laoding, setLoading] = useState(false)
+  const [congratulations, setCongratulations] = useState(false)
 
   const click = async () => {
+    setCongratulations(false)
     setLoading(true)
     await onClick()
+    setCongratulations(true)
     setLoading(false)
+  }
+
+  // https://daniel-lundin.github.io/react-dom-confetti/
+  const config = {
+    angle: 90,
+    spread: 126,
+    startVelocity: 15,
+    elementCount: 37,
+    dragFriction: 0.12,
+    duration: 2100,
+    stagger: 3,
+    width: '7px',
+    height: '7px',
+    perspective: '498px',
+    colors: ['#f00', '#0f0', '#00f'],
   }
 
   return (
@@ -139,6 +158,7 @@ const LoadingButton: React.FC<LoadingButtonProps> = ({ children, onClick }) => {
       className={clsx('btn btn-accent btn-sm', laoding ? 'loading' : '')}
       onClick={click}
     >
+      <Confetti active={congratulations} config={config} />
       {children}
     </button>
   )
@@ -149,17 +169,33 @@ const Main: React.FC = () => {
   const alert = useAlert()
 
   useEffect(() => {
-    api.get_view_state().then(setState)
+    let isActive = true
+    const update = async () => {
+      const data = await api.get_view_state()
+      if (isActive) setState(data)
+    }
+
+    let intervalId = setInterval(update, 5000)
+    update()
+
+    return () => {
+      clearInterval(intervalId)
+      isActive = false
+    }
   }, [])
 
   const vote = async (candidate: string) => {
     const res = await api.vote(candidate)
-    if (!res) {
+    if (res === null) {
       alert.show(`You already voted for ${candidate}!`)
       return
     }
 
-    await api.get_view_state().then(setState)
+    for (let c of state) {
+      if (c.candidate === candidate) c.votes += 1
+    }
+
+    setState([...state])
   }
 
   const addCandidate = async (candidate: string) => {
@@ -170,6 +206,15 @@ const Main: React.FC = () => {
     }
 
     await api.get_view_state().then(setState)
+  }
+
+  const getPlaceIcon = (place: number) => {
+    let placeIcons: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
+    if (place in placeIcons) {
+      return <span className="text-3xl leading-none">{placeIcons[place]}</span>
+    }
+
+    return place.toString()
   }
 
   const candidates = state.sort((a, b) => b.votes - a.votes)
@@ -193,39 +238,45 @@ const Main: React.FC = () => {
           </button>
         </div>
       </div>
-      <div className="flex flex-col justify-center items-center">
+      <div className="flex flex-col justify-center items-center my-5">
         <div className="w-full max-w-2xl">
-          <div className="mb-4 w-full">
-            <AddCandidate onClick={addCandidate} />
-          </div>
           <table className="table w-full">
             <thead>
               <tr>
-                <th></th>
+                <th className="text-center">Place</th>
                 <th className="text-center">Candidate</th>
                 <th className="text-center">Votes</th>
-                <th className="w-48"></th>
+                <th className="md:w-48"></th>
               </tr>
             </thead>
             <FlipMove className="table-row-group">
               {candidates.map((x, idx) => (
-                <tr key={x.candidate}>
-                  <th>{idx + 1}</th>
+                <tr key={x.candidate} className="bg-base-100 even:bg-base-200">
+                  <th className="text-center font-normal">
+                    {getPlaceIcon(idx + 1)}
+                  </th>
                   <td className="text-center">{x.candidate}</td>
-                  <td className="text-center">{x.votes}</td>
-                  <td className="flex justify-center w-48">
+                  <td className="text-center font-bold">{x.votes}</td>
+                  <td className="flex justify-center md:w-48">
                     {x.can_vote ? (
-                      <LoadingButton onClick={() => vote(x.candidate)}>
+                      <VoteButton onClick={() => vote(x.candidate)}>
                         Vote!
-                      </LoadingButton>
+                      </VoteButton>
                     ) : (
-                      'You already vote!'
+                      '✅'
                     )}
                   </td>
                 </tr>
               ))}
             </FlipMove>
           </table>
+
+          <div className="w-full mt-12 mb-20 px-5">
+            <p className="text-center text-xl my-3">
+              Don't like any of the candidates? Add your own:
+            </p>
+            <AddCandidate onClick={addCandidate} />
+          </div>
         </div>
       </div>
     </div>
