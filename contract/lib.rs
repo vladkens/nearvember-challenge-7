@@ -50,7 +50,12 @@ impl Default for Contract {
 #[near_bindgen]
 impl Contract {
     pub fn add_candidate(&mut self, candidate: String) {
-        assert!(self.candidates.get(&candidate).is_none(), "candidate already exists");
+        let candidate_lower = candidate.clone().to_lowercase();
+        for exist in self.candidates.keys() {
+            if candidate_lower == exist.to_lowercase() {
+                env::panic("candidate already exists".as_bytes());
+            }
+        }
 
         let c = Candidate { id: self.candidate_counter, votes: 0 };
         self.candidates.insert(&candidate, &c);
@@ -253,5 +258,17 @@ mod tests {
         let s = contract.get_view_state(account.clone());
         assert_eq!(false, s[0].can_vote);
         assert_eq!(true, s[1].can_vote);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_no_spoilers() {
+        let context = VMContextBuilder::new();
+        testing_env!(context.build());
+        let mut contract = Contract::default();
+
+        contract.add_candidate("Abc".to_string());
+        contract.add_candidate("zyx".to_string());
+        contract.add_candidate("abc".to_string());
     }
 }
