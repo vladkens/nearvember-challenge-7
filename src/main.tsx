@@ -9,7 +9,10 @@ import { initContract } from './near-utils'
 window.Buffer = Buffer
 
 const main = async () => {
-  await initContract(['get_candidates'], ['vote', 'add_candidate'])
+  await initContract(
+    ['get_candidates', 'get_view_state'],
+    ['vote', 'add_candidate']
+  )
 
   ReactDOM.render(
     <React.StrictMode>

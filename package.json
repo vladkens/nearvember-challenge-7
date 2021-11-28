@@ -7,7 +7,8 @@
     "build": "tsc && vite build",
     "serve": "vite preview",
     "contr:build": "cargo build --target wasm32-unknown-unknown --release && cp target/wasm32-unknown-unknown/release/main.wasm out/",
-    "contr:dev": "yarn contr-build && near dev-deploy"
+    "contr:dev": "yarn contr-build && near dev-deploy",
+    "contr:test": "cargo test -- --nocapture"
   },
   "dependencies": {
     "@heroicons/react": "^1.0.5",

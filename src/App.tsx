@@ -12,8 +12,20 @@ import NearLogo from './assets/logo-white.svg'
 import { login, logout } from './near-utils'
 
 type Candidates = Record<string, number>
+type ViewItem = {
+  candidate: string
+  votes: number
+  can_vote: boolean
+}
 
 const api = {
+  async get_view_state() {
+    // @ts-expect-error
+    return (await window.contract.get_view_state({
+      account_id: window.accountId,
+    })) as ViewItem[]
+  },
+
   async get_candidates() {
     // @ts-expect-error
     const res = (await window.contract.get_candidates()) as any[]
@@ -132,11 +144,11 @@ const LoadingButton: React.FC<LoadingButtonProps> = ({ children, onClick }) => {
 }
 
 const Main: React.FC = () => {
-  const [candidates, setCandidates] = useState<Candidates>({})
+  const [state, setState] = useState<ViewItem[]>([])
   const alert = useAlert()
 
   useEffect(() => {
-    api.get_candidates().then(setCandidates)
+    api.get_view_state().then(setState)
   }, [])
 
   const vote = async (candidate: string) => {
@@ -146,8 +158,7 @@ const Main: React.FC = () => {
       return
     }
 
-    const upd = await api.get_candidates()
-    setCandidates(upd)
+    await api.get_view_state().then(setState)
   }
 
   const addCandidate = async (candidate: string) => {
@@ -157,16 +168,10 @@ const Main: React.FC = () => {
       return
     }
 
-    const upd = await api.get_candidates()
-    setCandidates(upd)
+    await api.get_view_state().then(setState)
   }
 
-  const candidatesList = Object.entries(candidates)
-    .map((x) => ({
-      name: x[0],
-      votes: x[1],
-    }))
-    .sort((a, b) => b.votes - a.votes)
+  const candidates = state.sort((a, b) => b.votes - a.votes)
 
   return (
     <div>
@@ -202,15 +207,19 @@ const Main: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {candidatesList.map((x, idx) => (
-                <tr key={x.name}>
+              {candidates.map((x, idx) => (
+                <tr key={x.candidate}>
                   <th>{idx + 1}</th>
-                  <td className="text-center">{x.name}</td>
+                  <td className="text-center">{x.candidate}</td>
                   <td className="text-center">{x.votes}</td>
                   <td className="flex justify-center w-48">
-                    <LoadingButton onClick={() => vote(x.name)}>
-                      Vote!
-                    </LoadingButton>
+                    {x.can_vote ? (
+                      <LoadingButton onClick={() => vote(x.candidate)}>
+                        Vote!
+                      </LoadingButton>
+                    ) : (
+                      'You already vote!'
+                    )}
                   </td>
                 </tr>
               ))}

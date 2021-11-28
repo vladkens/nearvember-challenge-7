@@ -17,13 +17,21 @@ pub struct Candidate {
     pub votes: u32,
 }
 
+#[derive(Deserialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct ViewItem {
+    pub candidate: String,
+    pub votes: u32,
+    pub can_vote: bool,
+}
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
     pub candidate_counter: u32,
     pub voter_counter: u32,
-    pub candidates: UnorderedMap<String, Candidate>, // candidatName & votes
-    pub voters: LookupMap<String, u32>, // accountId
+    pub candidates: UnorderedMap<String, Candidate>, // candidateName : { id, votes }
+    pub voters: LookupMap<String, u32>, // accountId : id
     pub votes: LookupSet<String>, // candidateId_accoundId
 }
 
@@ -59,22 +67,19 @@ impl Contract {
             None => {
                 env::panic("candidate not exists".as_bytes());
             }
-            Some(v) => {
-                c = v;
-            }
+            Some(v) => c = v
         }
 
-        let voter = env::predecessor_account_id();
         let voter_id;
+        let voter = env::predecessor_account_id();
+        // println!("{}", voter);
         match self.voters.get(&voter) {
             None => {
                 voter_id = self.voter_counter;
                 self.voters.insert(&voter, &self.voter_counter);
                 self.voter_counter += 1;
             }
-            Some(v) => {
-                voter_id = v;
-            }
+            Some(v) => voter_id = v
         }
 
         let vote_id = [c.id.to_string(), voter_id.to_string()].join("_");
@@ -86,13 +91,36 @@ impl Contract {
 
         c.votes
     }
+
+    pub fn get_view_state(&self, account_id: String) -> Vec<ViewItem> {
+        let mut state: Vec<ViewItem> = Vec::new();
+        let voter_id = self.voters.get(&account_id);
+
+        for item in self.candidates.iter() {
+            let candidate = item.0;
+            let votes = item.1.votes;
+            let can_vote = voter_id.is_none() || 
+                !self.votes.contains(&[item.1.id.to_string(), voter_id.unwrap().to_string()].join("_"));
+
+            state.push(ViewItem{candidate, votes, can_vote});
+        }
+
+        state
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use near_sdk::{MockedBlockchain, testing_env};
-    use near_sdk::test_utils::VMContextBuilder;
+    use near_sdk::{MockedBlockchain, testing_env, VMContext};
+    use near_sdk::test_utils::{VMContextBuilder};
+
+    fn get_context(account_id: String) -> VMContext {
+        VMContextBuilder::new()
+            .predecessor_account_id(account_id.try_into().unwrap())
+            // .is_view(is_view)
+            .build()
+    }
 
     #[test]
     fn test_add_candidate() {
@@ -190,16 +218,40 @@ mod tests {
 
     #[test]
     fn test_different_can_vote() {
-        let mut context = VMContextBuilder::new();
-        testing_env!(context.build());
+        let ctx = get_context("bob.near".to_string());
+        testing_env!(ctx);
 
         let mut contract = Contract::default();
         contract.add_candidate("abc".to_string());
         contract.vote("abc".to_string());
 
-        context.predecessor_account_id("alice.testnet".to_string().try_into().unwrap());
-        contract.vote("abc".to_string());
+        let ctx = get_context("abc.near".to_string());
+        testing_env!(ctx);
 
-        // let c = contract.get_candidates();
+        contract.vote("abc".to_string());
+        let s = contract.get_candidates();
+        assert_eq!(1, s.len());
+        assert_eq!(2, (s[0].1).votes);
+    }
+
+    #[test]
+    fn test_view_state() {
+        let context = VMContextBuilder::new();
+        testing_env!(context.build());
+        let mut contract = Contract::default();
+
+        contract.add_candidate("abc".to_string());
+        contract.add_candidate("xyz".to_string());
+
+        let account = context.context.predecessor_account_id;
+
+        let s = contract.get_view_state(account.clone());
+        assert_eq!(true, s[0].can_vote);
+        assert_eq!(true, s[1].can_vote);
+
+        contract.vote("abc".to_string());
+        let s = contract.get_view_state(account.clone());
+        assert_eq!(false, s[0].can_vote);
+        assert_eq!(true, s[1].can_vote);
     }
 }
