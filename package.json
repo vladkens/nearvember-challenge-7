@@ -19,7 +19,8 @@
     "p-defer": "^4.0.0",
     "react": "^17.0.0",
     "react-alert": "^7.0.3",
-    "react-dom": "^17.0.0"
+    "react-dom": "^17.0.0",
+    "react-flip-move": "^3.0.4"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

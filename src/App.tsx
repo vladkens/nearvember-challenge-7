@@ -8,6 +8,7 @@ import {
   transitions,
   useAlert,
 } from 'react-alert'
+import FlipMove from 'react-flip-move'
 import NearLogo from './assets/logo-white.svg'
 import { login, logout } from './near-utils'
 
@@ -206,7 +207,7 @@ const Main: React.FC = () => {
                 <th className="w-48"></th>
               </tr>
             </thead>
-            <tbody>
+            <FlipMove className="table-row-group">
               {candidates.map((x, idx) => (
                 <tr key={x.candidate}>
                   <th>{idx + 1}</th>
@@ -223,7 +224,7 @@ const Main: React.FC = () => {
                   </td>
                 </tr>
               ))}
-            </tbody>
+            </FlipMove>
           </table>
         </div>
       </div>
