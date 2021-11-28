@@ -36,11 +36,11 @@ const api = {
     return candidates
   },
 
-  async vote(candidate: string): Promise<null | number> {
+  async vote(candidate: string): Promise<boolean> {
     // @ts-expect-error
     return window.contract.vote({ candidate }).then(
-      (d: number) => d,
-      (d: string) => null
+      (d: number) => true,
+      (d: string) => false
     )
   },
 
@@ -124,19 +124,14 @@ const AddCandidate: React.FC<AddCandidateProps> = ({ onClick }) => {
   )
 }
 
-type VoteButtonProps = { onClick: () => void }
+type VoteButtonProps = {
+  onClick: () => Promise<void>
+  can_vote: boolean
+}
 
-const VoteButton: React.FC<VoteButtonProps> = ({ children, onClick }) => {
+const VoteButton: React.FC<VoteButtonProps> = ({ onClick, can_vote }) => {
   const [laoding, setLoading] = useState(false)
   const [congratulations, setCongratulations] = useState(false)
-
-  const click = async () => {
-    setCongratulations(false)
-    setLoading(true)
-    await onClick()
-    setCongratulations(true)
-    setLoading(false)
-  }
 
   // https://daniel-lundin.github.io/react-dom-confetti/
   const config = {
@@ -153,14 +148,28 @@ const VoteButton: React.FC<VoteButtonProps> = ({ children, onClick }) => {
     colors: ['#f00', '#0f0', '#00f'],
   }
 
+  const click = async () => {
+    setCongratulations(false)
+    setLoading(true)
+    await onClick()
+    setLoading(false)
+    setCongratulations(true)
+  }
+
   return (
-    <button
-      className={clsx('btn btn-accent btn-sm', laoding ? 'loading' : '')}
-      onClick={click}
-    >
+    <>
       <Confetti active={congratulations} config={config} />
-      {children}
-    </button>
+      {can_vote ? (
+        <button
+          className={clsx('btn btn-error btn-sm', laoding ? 'loading' : '')}
+          onClick={click}
+        >
+          Vote!
+        </button>
+      ) : (
+        '✅'
+      )}
+    </>
   )
 }
 
@@ -184,20 +193,6 @@ const Main: React.FC = () => {
     }
   }, [])
 
-  const vote = async (candidate: string) => {
-    const res = await api.vote(candidate)
-    if (res === null) {
-      alert.show(`You already voted for ${candidate}!`)
-      return
-    }
-
-    for (let c of state) {
-      if (c.candidate === candidate) c.votes += 1
-    }
-
-    setState([...state])
-  }
-
   const addCandidate = async (candidate: string) => {
     const res = await api.add_candidate(candidate)
     if (!res) {
@@ -206,6 +201,24 @@ const Main: React.FC = () => {
     }
 
     await api.get_view_state().then(setState)
+  }
+
+  const vote = async (candidate: string) => {
+    const success = await api.vote(candidate)
+
+    if (!success) {
+      alert.show(`You already voted for ${candidate}!`)
+      return
+    }
+
+    for (let c of state) {
+      if (c.candidate === candidate) {
+        c.votes += 1
+        c.can_vote = false
+      }
+    }
+
+    setState([...state])
   }
 
   const getPlaceIcon = (place: number) => {
@@ -258,13 +271,10 @@ const Main: React.FC = () => {
                   <td className="text-center">{x.candidate}</td>
                   <td className="text-center font-bold">{x.votes}</td>
                   <td className="flex justify-center md:w-48">
-                    {x.can_vote ? (
-                      <VoteButton onClick={() => vote(x.candidate)}>
-                        Vote!
-                      </VoteButton>
-                    ) : (
-                      '✅'
-                    )}
+                    <VoteButton
+                      onClick={() => vote(x.candidate)}
+                      can_vote={x.can_vote}
+                    />
                   </td>
                 </tr>
               ))}
