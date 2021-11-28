@@ -247,9 +247,10 @@ const Alert: React.FC<AlertComponentPropsWithStyle> = ({
 
 const App: React.FC = () => {
   const options = {
-    position: positions.BOTTOM_CENTER,
-    timeout: 4000,
+    position: positions.TOP_RIGHT,
+    timeout: 5000,
     transition: transitions.SCALE,
+    offset: '76px 10px',
   }
 
   return (
