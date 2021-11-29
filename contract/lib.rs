@@ -142,18 +142,14 @@ mod tests {
         let s = contract.get_candidates();
         assert_eq!(1, s.len());
         assert_eq!("abc".to_string(), s[0].0);
-
-        let c = &s[0].1;
-        assert_eq!(0, c.id);
-        assert_eq!(0, c.votes);
+        assert_eq!(0, s[0].1.id);
+        assert_eq!(0, s[0].1.votes);
 
         contract.add_candidate("xyz".to_string());
         let s = contract.get_candidates();
         assert_eq!(2, s.len());
-
-        let c = &s[1].1;
-        assert_eq!(1, c.id);
-        assert_eq!(0, c.votes);
+        assert_eq!(1, s[1].1.id);
+        assert_eq!(0, s[1].1.votes);
     }
 
     #[test]
